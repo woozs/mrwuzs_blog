@@ -3,6 +3,7 @@ from .models import Blog,BlogType
 from django.core.paginator import Paginator
 from django.conf import settings
 from django.db.models import Count
+from read_statistics.utils import read_statistics_once_read
 # Create your views here.
 
 def get_blog_list_common_data(requset,blogs_all_list):
@@ -57,14 +58,16 @@ def blog_list(requset):
 
 
 def blog_detail(requset,blog_pk):
-    blogs_all_list = Blog.objects.all()
-    context = get_blog_list_common_data(requset, blogs_all_list)
-    blog = get_object_or_404(Blog,pk=blog_pk)
-    context['previous_blog'] = Blog.objects.filter(created_time__gt=blog.created_time).last()
-    context['next_blog'] = Blog.objects.filter(created_time__lt= blog.created_time).first()
-    context['blog'] = blog
-    return render_to_response('blog/blog_detail.html', context)
+    blog = get_object_or_404(Blog, pk=blog_pk)
+    read_cookie_key = read_statistics_once_read(requset, blog)
 
+    context = {}
+    context['previous_blog'] = Blog.objects.filter(created_time__gt=blog.created_time).last()
+    context['next_blog'] = Blog.objects.filter(created_time__lt=blog.created_time).first()
+    context['blog'] = blog
+    response = render_to_response('blog/blog_detail.html', context)  # 响应
+    response.set_cookie(read_cookie_key, 'true')  # 阅读cookie标记
+    return response
 
 
 def blogs_with_type(requset,type_pk):
