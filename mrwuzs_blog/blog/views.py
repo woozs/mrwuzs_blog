@@ -1,14 +1,16 @@
-from django.shortcuts import render_to_response,get_object_or_404
+from django.shortcuts import render_to_response,get_object_or_404,render
 from .models import Blog,BlogType
 from django.core.paginator import Paginator
 from django.conf import settings
 from django.db.models import Count
 from read_statistics.utils import read_statistics_once_read
+from django.contrib.contenttypes.models import ContentType
+from comment.models import Comment
 # Create your views here.
 
-def get_blog_list_common_data(requset,blogs_all_list):
+def get_blog_list_common_data(request,blogs_all_list):
     paginator = Paginator(blogs_all_list, settings.EACH_PAGE_BLOGS_NUMBER)
-    page_num = requset.GET.get("page", 1)
+    page_num = request.GET.get("page", 1)
     page_of_blogs = paginator.get_page(page_num)
     current_page_num = page_of_blogs.number  # 获取当前页码
     # 获取当前页前后2页
@@ -49,40 +51,43 @@ def get_blog_list_common_data(requset,blogs_all_list):
     return context
 
 
-def blog_list(requset):
+def blog_list(request):
     blogs_all_list = Blog.objects.all()
-    context = get_blog_list_common_data(requset,blogs_all_list)
-    return  render_to_response('blog/blog_list.html', context)
+    context = get_blog_list_common_data(request,blogs_all_list)
+    return render(request,'blog/blog_list.html', context)
 
 
 
 
-def blog_detail(requset,blog_pk):
+def blog_detail(request,blog_pk):
     blog = get_object_or_404(Blog, pk=blog_pk)
-    read_cookie_key = read_statistics_once_read(requset, blog)
+    read_cookie_key = read_statistics_once_read(request, blog)
+    blog_content_type = ContentType.objects.get_for_model(blog)
+    comments = Comment.objects.filter(content_type=blog_content_type, object_id=blog.pk)
 
     context = {}
     context['previous_blog'] = Blog.objects.filter(created_time__gt=blog.created_time).last()
     context['next_blog'] = Blog.objects.filter(created_time__lt=blog.created_time).first()
     context['blog'] = blog
-    response = render_to_response('blog/blog_detail.html', context)  # 响应
+    context['comments'] = comments
+    response = render(request,'blog/blog_detail.html', context)  # 响应
     response.set_cookie(read_cookie_key, 'true')  # 阅读cookie标记
     return response
 
 
-def blogs_with_type(requset,type_pk):
+def blogs_with_type(request,type_pk):
     blog_type = get_object_or_404(BlogType,pk=type_pk)
     blogs_all_list = Blog.objects.filter(blog_type = blog_type)
-    context = get_blog_list_common_data(requset, blogs_all_list)
+    context = get_blog_list_common_data(request, blogs_all_list)
     context['blog_type'] = blog_type
-    return render_to_response('blog/blogs_with_type.html', context)
+    return render(request,'blog/blogs_with_type.html', context)
 
 
-def blogs_with_date(requset,year,month):
+def blogs_with_date(request,year,month):
     blogs_all_list = Blog.objects.filter(created_time__year=year,created_time__month=month)
-    context = get_blog_list_common_data(requset, blogs_all_list)
+    context = get_blog_list_common_data(request, blogs_all_list)
     context['blogs_with_date'] = ' %s 年 %s 月'%(year,month)
-    return render_to_response('blog/blogs_with_date.html', context)
+    return render(request,'blog/blogs_with_date.html', context)
 
 
 
